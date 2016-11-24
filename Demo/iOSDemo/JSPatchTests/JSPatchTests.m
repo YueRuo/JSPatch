@@ -12,12 +12,14 @@
 #import "JPTestObject.h"
 #import "JPInheritanceTestObjects.h"
 #import "JPMultithreadTestObject.h"
-#import "JPInclude.h"
 #import "newProtocolTest.h"
-//#import "JPCoreGraphics.h"
-//#import "JPUIKit.h"
-#import "SuperTestObject.h"
+#import "JPSuperTestObject.h"
+#import "JPJSClassTest.h"
 #import "JPMemory.h"
+#import "JPPerformanceTest.h"
+#import "JPCFunctionTest.h"
+#import "JPNumberTest.h"
+
 @interface JSPatchTests : XCTestCase
 
 @end
@@ -26,14 +28,13 @@
 - (void)loadPatch:(NSString *)patchName
 {
     NSString *jsPath = [[NSBundle bundleForClass:[self class]] pathForResource:patchName ofType:@"js"];
-    NSString *jsScript = [NSString stringWithContentsOfFile:jsPath encoding:NSUTF8StringEncoding error:nil];
-    [JPEngine evaluateScript:jsScript];
+    [JPEngine evaluateScriptWithPath:jsPath];
 }
 
 - (void)setUp {
     [super setUp];
     [JPEngine startEngine];
-    [JPEngine addExtensions:@[@"JPInclude", @"JPMemory", @"JPStructPointer", @"JPCoreGraphics", @"JPUIKit"]];
+    [JPEngine addExtensions:@[@"JPMemory", @"JPStructPointer", @"JPCoreGraphics", @"JPUIKit"]];
 }
 
 - (void)tearDown {
@@ -52,6 +53,10 @@
     XCTAssert(obj.funcReturnVoidPassed, @"funcReturnVoidPassed");
     
     XCTAssert(obj.funcReturnStringPassed, @"funcReturnStringPassed");
+    
+    // Test for functions which return double/float, cause there's a fatal bug in NSInvocation on iOS7.0
+    // This case shall fail if you comment line 957~959 in JPEngine.m on iOS7.0.
+    XCTAssert(obj.funcReturnDoublePassed, @"funcReturnDoublePassed");
     
     XCTAssert(obj.funcWithIntPassed, @"funcWithIntPassed");
     XCTAssert(obj.funcWithNilPassed, @"funcWithNilPassed");
@@ -139,10 +144,20 @@
     XCTAssert(obj.classFuncToSwizzleReturnObjPassed, @"classFuncToSwizzleReturnObjPassed");
     XCTAssert(obj.classFuncToSwizzleReturnObjCalledOriginalPassed, @"classFuncToSwizzleReturnObjCalledOriginalPassed");
     XCTAssert(obj.classFuncToSwizzleReturnIntPassed, @"classFuncToSwizzleReturnIntPassed");
+    // Test for functions which return double/float, cause there's a fatal bug in NSInvocation on iOS7.0
+    // This case shall fail if you comment line 1050~1052 in JPEngine.m on iOS7.0.
+    XCTAssert(obj.classFuncToSwizzleReturnDoublePassed, @"classFuncToSwizzleReturnDoublePassed");
     
     XCTAssert(subObj.funcCallSuperSubObjectPassed, @"funcCallSuperSubObjectPassed");
     XCTAssert(subObj.funcCallSuperPassed, @"funcCallSuperPassed");
     XCTAssert(obj.callForwardInvocationPassed, @"callForwardInvocationPassed");
+    
+    JPTestSwizzledForwardInvocationSubObject *tmp = [[JPTestSwizzledForwardInvocationSubObject alloc] init];
+    [tmp callTestSwizzledSuperForwardInvocation];
+    XCTAssert(!tmp.callSwizzledSuperForwardInvocationPassed);
+    [tmp swizzleSuperForwoardInvocation];
+    [tmp callTestSwizzledSuperForwardInvocation];
+    XCTAssert(tmp.callSwizzledSuperForwardInvocationPassed);
     
     XCTAssert(obj.propertySetFramePassed, @"propertySetFramePassed");
     XCTAssert(obj.propertySetViewPassed, @"propertySetViewPassed");
@@ -161,6 +176,9 @@
     
     XCTAssertEqualObjects(@"overrided",[subObj funcOverrideParentMethod]);
     
+    XCTAssert(obj.variableParameterMethodPassed, @"variableParameterMethodPassed");
+    
+    
     JPTestProtocolObject *testProtocolObj = [[JPTestProtocolObject alloc] init];
     XCTAssert([testProtocolObj testProtocolMethods], @"testProtocolMethodsPassed");
     
@@ -175,12 +193,20 @@
                                  beforeDate:[NSDate dateWithTimeIntervalSinceNow:10]];
 }
 
+- (void)testJSClass
+{
+    [self loadPatch:@"jsClassTest"];
+    XCTAssert([JPJSClassTest isPassA]);
+    XCTAssert([JPJSClassTest isPassB]);
+    XCTAssert([JPJSClassTest isPassC]);
+}
+
 - (void)testSuperClass
 {
     [self loadPatch:@"superTest"];
-    SuperTestC *testobject = [[SuperTestC alloc]init];
-    [testobject testSuper];
-    XCTAssert(testobject.hasTestSuperA);
+    XCTAssert([JPSuperTestResult isPassA]);
+    XCTAssert([JPSuperTestResult isPassB]);
+    XCTAssert([JPSuperTestResult isPassC]);
 }
 
 - (void)testInheritance
@@ -250,6 +276,26 @@
 }
 
 
+- (void)testCFunction
+{
+    [self loadPatch:@"jsCFunctionTest"];
+    XCTAssert([JPCFunctionTest testCfuncWithId], @"testCfuncWithId");
+    XCTAssert([JPCFunctionTest testCfuncWithInt], @"testCfuncWithInt");
+    XCTAssert([JPCFunctionTest testCfuncWithCGFloat], @"testCfuncWithCGFloat");
+    XCTAssert([JPCFunctionTest testCfuncReturnPointer], @"testCfuncReturnPointer");
+    XCTAssert([JPCFunctionTest testCFunctionReturnClass], @"testCFunctionReturnClass");
+    XCTAssert([JPCFunctionTest testCFunctionVoid], @"testCFunctionVoid");
+}
+
+#pragma mark - jsNumberTest
+
+- (void)testJPNumber {
+    [self loadPatch:@"jsNumberTest"];
+    XCTAssert([JPNumberTest testJPNumNSNumber], @"testJPNumNSNumber");
+    XCTAssert([JPNumberTest testJPNumNSDecimalNumber], @"testJPNumNSDecimalNumber");
+    XCTAssert([JPNumberTest testJPNumToJS], @"testJPNumToJS");
+    XCTAssert([JPNumberTest testJPNUmToOC], @"testJPNumToOC");
+}
 
 #pragma mark - multithreadTest
 
@@ -320,63 +366,109 @@ void thread(void* context)
 
 
 #pragma mark - performance
-
 - (void)testJSCallEmptyMethodPerformance
 {
-    [self loadPatch:@"test"];
-    JPTestObject *obj = [[JPTestObject alloc] init];
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
     [self measureBlock:^{
-        [obj jsCallEmptyMethod];
+        [obj testJSCallOCEmptyMethod];
     }];
 }
 
 - (void)testJSCallMethodWithParamObjectPerformance
 {
-    [self loadPatch:@"test"];
-    JPTestObject *obj = [[JPTestObject alloc] init];
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
     [self measureBlock:^{
-        [obj jsCallMethodWithParamObject];
+        [obj testJSCallOCMethodWithParamObject];
     }];
 }
 - (void)testJSCallMethodReturnObjectPerformance
 {
-    [self loadPatch:@"test"];
-    JPTestObject *obj = [[JPTestObject alloc] init];
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
     [self measureBlock:^{
-        [obj jsCallMethodReturnObject];
+        [obj testJSCallOCMethodReturnObject];
     }];
 }
 - (void)testOCCallJSEmptyMethodPerformance
 {
-    [self loadPatch:@"test"];
-    JPTestObject *obj = [[JPTestObject alloc] init];
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
     [self measureBlock:^{
-        for (int i = 0; i < 10000; i ++) {
-            [obj emptyMethodToOverride];
-        }
+        [obj testOCCallEmptyMethod];
     }];
 }
 - (void)testOCCallJSMethodWithParamObjectPerformance
 {
-    [self loadPatch:@"test"];
-    JPTestObject *obj = [[JPTestObject alloc] init];
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
     [self measureBlock:^{
-        for (int i = 0; i < 10000; i ++) {
-            [obj methodWithParamObjectToOverride:obj];
-        }
+        [obj testOCCallMethodWithParamObject];
     }];
 }
 - (void)testOCCallJSMethodReturnObjectPerformance
 {
-    [self loadPatch:@"test"];
-    JPTestObject *obj = [[JPTestObject alloc] init];
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
     [self measureBlock:^{
-        for (int i = 0; i < 10000; i ++) {
-            [obj methodReturnObjectToOverride];
-        }
+        [obj testOCCallMethodReturnObject];
     }];
 }
 
+- (void)testJSCallJSEmptyMethod
+{
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
+    [self measureBlock:^{
+        [obj testJSCallJSEmptyMethod];
+    }];
+}
+
+- (void)testJSCallJSMethodWithParam
+{
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
+    [self measureBlock:^{
+        [obj testJSCallJSMethodWithParam];
+    }];
+}
+
+- (void)testJSCallJSMethodWithLargeDictionaryParam
+{
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
+    [self measureBlock:^{
+        [obj testJSCallJSMethodWithLargeDictionaryParam];
+    }];
+}
+
+- (void)testJSCallJSMethodWithLargeDictionaryParamAutoConvert
+{
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
+    [self measureBlock:^{
+        [obj testJSCallJSMethodWithLargeDictionaryParamAutoConvert];
+    }];
+}
+
+- (void)testJSCallMallocJPMemory
+{
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
+    [self measureBlock:^{
+        [obj testJSCallMallocJPMemory];
+    }];
+}
+
+- (void)testJSCallMallocJPCFunction
+{
+    [self loadPatch:@"performanceTest"];
+    JPPerformanceTest *obj = [[JPPerformanceTest alloc] init];
+    [self measureBlock:^{
+        [obj testJSCallMallocJPCFunction];
+    }];
+}
 
 - (void)testNewProtocol{
     [self loadPatch:@"newProtocolTest"];
@@ -438,4 +530,5 @@ void thread(void* context)
     XCTAssertTrue(CGSizeEqualToSize(retClassTest3, CGSizeMake(100, 100)));
     NSLog(@"new protocol object test end");
 }
+
 @end

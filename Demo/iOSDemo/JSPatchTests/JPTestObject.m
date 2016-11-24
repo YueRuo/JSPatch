@@ -7,6 +7,7 @@
 //
 
 #import "JPTestObject.h"
+#import <objc/runtime.h>
 
 @implementation JPTestObject
 - (void)funcReturnVoid
@@ -17,6 +18,10 @@
 - (NSString *)funcReturnString
 {
     return @"stringFromOC";
+}
+
+- (double)funcReturnDouble {
+    return 100.0;
 }
 
 - (CGRect)funcWithRectAndReturnRect:(CGRect)rect
@@ -219,6 +224,11 @@ typedef struct {
     int retI = [JPTestObject classFuncToSwizzleReturnInt:42];
     if (retI == 42) {
         self.classFuncToSwizzleReturnIntPassed = YES;
+    }
+    
+    double retD = [JPTestObject classFuncToSwizzleReturnDouble:100.0];
+    if (fabs(retD - 100.0) < FLT_EPSILON) {
+        self.classFuncToSwizzleReturnDoublePassed = YES;
     }
     
     [self funcToSwizzleWithBlock:^(UIView *view, int num) {
@@ -446,7 +456,10 @@ typedef NSString * (^JSBlock)(NSError *);
     return 0;
 }
 
-
++ (double)classFuncToSwizzleReturnDouble:(double)d
+{
+    return 0;
+}
 
 
 #pragma mark - super
@@ -531,35 +544,6 @@ typedef NSString * (^JSBlock)(NSError *);
     transform->tx = 42;
 }
 
-#pragma mark performance
-static NSObject *testPerformanceObj;
-- (void)initTestPerformanceObj {
-    if (!testPerformanceObj) testPerformanceObj = [[NSObject alloc] init];
-}
-- (void)emptyMethod {
-    
-}
-
-- (void)methodWithParamObject:(NSObject *)obj {
-    
-}
-- (NSObject *)methodReturnObject {
-    return testPerformanceObj;
-}
-
-- (void)emptyMethodToOverride {
-    
-}
-- (void)methodWithParamObjectToOverride:(NSObject *)obj {
-    
-}
-- (NSObject *)methodReturnObjectToOverride {
-    return nil;
-}
-
-- (void)jsCallEmptyMethod {}
-- (void)jsCallMethodWithParamObject{}
-- (void)jsCallMethodReturnObject{}
 
 @end
 
@@ -592,4 +576,47 @@ static NSObject *testPerformanceObj;
     return dNum - 4.2 < 0.001 && iNum == 42 && [str isEqualToString:@"JSPatch"];
 }
 #pragma clang diagnostic pop
+@end
+
+@implementation JPTestSwizzledForwardInvocationSuperObject
+
+- (void)swizzleSuperForwoardInvocation
+{
+    class_replaceMethod([JPTestSwizzledForwardInvocationSuperObject class], @selector(forwardInvocation:), (IMP)SwizzledSuperForwardInvocation, "v@:@");
+}
+
+static void SwizzledSuperForwardInvocation(__unsafe_unretained id assignSlf, SEL selector, NSInvocation *invocation)
+{
+    if ([NSStringFromSelector(invocation.selector) isEqualToString:@"testSwizzledSuperForwardInvocation"]) {
+        ((JPTestSwizzledForwardInvocationSuperObject *)assignSlf).callSwizzledSuperForwardInvocationPassed = YES;
+    }
+}
+
+- (void)forwardInvocation:(NSInvocation *)anInvocation
+{
+    if ([NSStringFromSelector(anInvocation.selector) isEqualToString:@"testSwizzledSuperForwardInvocation"]) {
+        self.callSwizzledSuperForwardInvocationPassed = NO;
+    }
+}
+
+@end
+
+@implementation JPTestSwizzledForwardInvocationSubObject
+
+- (void)callTestSwizzledSuperForwardInvocation
+{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundeclared-selector"
+    [self performSelector:@selector(testSwizzledSuperForwardInvocation) withObject:nil];
+#pragma clang diagnostic pop
+}
+
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector
+{
+    if ([NSStringFromSelector(aSelector) isEqualToString:@"testSwizzledSuperForwardInvocation"]) {
+        return [self methodSignatureForSelector:@selector(callTestSwizzledSuperForwardInvocation)];
+    }
+    return [super methodSignatureForSelector:aSelector];
+}
+
 @end

@@ -13,6 +13,7 @@
 - (void)funcWithInt:(int)intValue;
 @property (nonatomic, assign) BOOL funcReturnVoidPassed;
 @property (nonatomic, assign) BOOL funcReturnStringPassed;
+@property (nonatomic, assign) BOOL funcReturnDoublePassed;
 @property (nonatomic, assign) BOOL funcReturnViewWithFramePassed;
 @property (nonatomic, assign) BOOL funcWithViewAndReturnViewPassed;
 
@@ -82,6 +83,7 @@
 @property (nonatomic, assign) BOOL classFuncToSwizzleReturnObjPassed;
 @property (nonatomic, assign) BOOL classFuncToSwizzleReturnObjCalledOriginalPassed;
 @property (nonatomic, assign) BOOL classFuncToSwizzleReturnIntPassed;
+@property (nonatomic, assign) BOOL classFuncToSwizzleReturnDoublePassed;
 
 
 @property (nonatomic, assign) BOOL funcCallSuperPassed;
@@ -107,6 +109,8 @@
 @property (nonatomic, assign) BOOL consoleLogPassed;
 @property (nonatomic, assign) BOOL overrideParentMethodPassed;
 
+@property (nonatomic, assign) BOOL variableParameterMethodPassed;
+
 - (NSString*)funcOverrideParentMethod;
 - (void)funcToSwizzleTestGCD:(void(^)())block;
 
@@ -114,13 +118,6 @@
 - (NSDictionary *)funcToSwizzleReturnJSDictionary;
 - (NSArray *)funcToSwizzleReturnArray:(NSArray *)arr;
 - (NSString *)funcToSwizzleReturnString:(NSString *)str;
-
-- (void)jsCallEmptyMethod;
-- (void)jsCallMethodWithParamObject;
-- (void)jsCallMethodReturnObject;
-- (void)emptyMethodToOverride;
-- (void)methodWithParamObjectToOverride:(NSObject *)obj;
-- (NSObject *)methodReturnObjectToOverride;
 @end
 
 
@@ -140,4 +137,18 @@
 
 @interface JPTestProtocolObject : NSObject <JPTestProtocol, JPTestProtocol2>
 - (BOOL)testProtocolMethods;
+@end
+
+@interface JPTestSwizzledForwardInvocationSuperObject : NSObject
+
+@property (nonatomic, assign) BOOL callSwizzledSuperForwardInvocationPassed;
+
+- (void)swizzleSuperForwoardInvocation;
+
+@end
+
+@interface JPTestSwizzledForwardInvocationSubObject : JPTestSwizzledForwardInvocationSuperObject
+
+- (void)callTestSwizzledSuperForwardInvocation;
+
 @end
